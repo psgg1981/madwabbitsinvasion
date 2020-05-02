@@ -8,15 +8,12 @@ __lua__
 -- by pedro and mariana, may 2020
 
 -- game setup
-apple 		= { label="apple", s=10}
+apple 			= { label="apple", s=10}
 orange 		= { label="orange", s=26}
-lollipop 	= { label="lollipop", s=27}
-water 		= { label="water", s=28}
+lollipop	= { label="lollipop", s=27}
+water 			= { label="water", s=28}
 cherries	= { label="cherries", s=30}
-objs 		 = { apple, orange, lollipop, water, cherries }
-
-level		= { targetitem=objs[flr(rnd(#objs)) + 1],
-													maxscore = 8}
+objs 		 	= { apple, orange, lollipop, water, cherries }
 
 critters	= {}
 
@@ -28,12 +25,20 @@ player			 ={ -- position (in tiles)
 													dx=0,						-- velocity
 													dy=0,
 													lives = 3,
-													invincible = { is=false, since=nil}
+													invuln = { is=false, since=nil}
 											}
-										
-gamewon = false
-gamelost = false
-level_elapsedtime = time()
+											
+game 				=	{	debug = false,
+													won 		= false,
+													lost 	= false,
+													level				= { targetitem=objs[flr(rnd(#objs)) + 1],
+																										maxscore = 8,
+																										starttime = time(),
+																										elapsedtime = 0,
+																										maxtime = 30,
+																										timeleft = maxtime	}
+											}										
+
 
 function _init(newlevel)
 
@@ -43,33 +48,33 @@ function _init(newlevel)
 		-- reset score
 		score = 0
 		if(newlevel) then
-			level.maxscore = level.maxscore + flr(rnd(3)) + 3
+			game.level.maxscore = game.level.maxscore + flr(rnd(3)) + 3
 		else
-			level.maxscore = 8
+			game.level.maxscore = 8
 	 end
 	 
 	 -- reset player lives, if lost or starting a new game
 	 if (not newlevel) player.lives = 3
 	 		
 		-- reset game goals
-		oldgoalitem = level.goalitem
-		level.goalitem = objs[flr(rnd(#objs)) + 1]
-		reset_items(oldgoalitem, level.goalitem, 200)
+		oldgoalitem = game.level.goalitem
+		game.level.goalitem = objs[flr(rnd(#objs)) + 1]
+		reset_items(oldgoalitem, game.level.goalitem, 200)
 		
 		-- reset mad rabbits if game not won
 		if(not newlevel) then
 		 critters = {}  -- reset critters
 		 resetrabbitnames()
 			reshufflemadrabbits()
+			
 		else
 			add(critters, spawnmadrabbit())
 		end
 
 		-- start timer
-		level_starttime = time()
-		level_elapsedtime = 0
-		level_maxtime = 30
-		timeleft = level_maxtime - level_elapsedtime
+		game.level.starttime = time()
+		game.level.elapsedtime = 0
+		game.level.timeleft = game.level.maxtime - game.level.elapsedtime
 		
 		music(4,3000)		
 end
@@ -85,13 +90,22 @@ function _draw()
 	-- draw the whole map (128⁙32)
 	map()
 	
-	-- draw the player
-	spr(1+player.f,      -- frame index
-	 player.pos.x*8-4,	-- x (pixels)
-	 player.pos.y*8-4, -- y (pixels)
-	 1,1,player.d==-1    -- w,h, flip
-	)
-
+	-- draw the player (if he's not flashing)
+	if not player.flash then
+		spr(1+player.f,      -- frame index
+		 player.pos.x*8-4,	-- x (pixels)
+		 player.pos.y*8-4, -- y (pixels)
+		 1,1,player.d==-1    -- w,h, flip
+		)
+	end
+	
+	-- only draw the player on a non-flash frame
+	if(player.invuln.is) then 
+		if(player.flash) then player.flash = false
+		else player.flash = true
+		end
+	end
+	
 	-- draw player's lives
 	for i=0, player.lives-1 do
 		spr(5, 
@@ -105,115 +119,78 @@ function _draw()
 	end
 	
 	-- draw the goal item and progress
-	spr(level.goalitem.s, 
+	spr(game.level.goalitem.s, 
 						room_x*128+9,
 						room_y*128+17)	
 					  
-	print(score.."/"..level.maxscore, 
+	print(score.."/"..game.level.maxscore, 
 					  room_x*128+19,
 					  room_y*128+19, 7)
 
-	-- draw the timer
-	if (true) then
+	-- draw the timer 'sandglass'
+	drawtimer()
 
-	 if (timeleft/level_maxtime>=5/6) then
-			sandglass_s = 7
-	 end
-
-	 if (timeleft/level_maxtime>=4/6 and
-	 				timeleft/level_maxtime< 5/6) then
-			sandglass_s = 23
-	 end
-
-	 if (timeleft/level_maxtime>=3/6 and
-	 				timeleft/level_maxtime< 4/6) then
-			sandglass_s = 8
-	 end
-	 
-	 if (timeleft/level_maxtime>=2/6 and
-	 				timeleft/level_maxtime< 3/6) then
-			sandglass_s = 24
-	 end
-
-	 if (timeleft/level_maxtime>=1/6 and
-	 				timeleft/level_maxtime< 2/6) then
-			sandglass_s = 9
-	 end
-
-	 if (timeleft/level_maxtime< 1/6) then
-			sandglass_s = 25
-	 end
-	 	 	 
-	 if (timeleft==0) then
-			sandglass_s = 22
-	 end
-	 	 
-	 spr(sandglass_s, -- sandglass 
-						 room_x*128+9,
-						 room_y*128+26)	
- 
-		print(timeleft, 
-					  room_x*128+20,
-					  room_y*128+27)
-	end
-
+	-- draw the mad rabbits
  drawmadrabbits()
 		
  -- draw game won
-	if (gamewon) then
+	if (game.won) then
 		print("you won!", 
 				  room_x*128+50,
 					 room_y*128+55, 7)
 	end
 					  
  -- draw game over
-	if (gamelost) then
+	if (game.lost) then
 		timesuplbl = ""
 		yourdeadlbl = ""
-	 if(timeleft==0) 				timesuplbl = " time's up!"
+	 if(game.level.timeleft==0) 				timesuplbl = " time's up!"
 	 if(player.lives==0) yourdeadlbl = " you're dead!"
 		print("game over!"..timesuplbl..yourdeadlbl, 
 				  room_x*128+27,
 					  room_y*128+55, 7)
 	end
 
-	if(gamewon or gamelost) then
+	if(game.won or game.lost) then
 		print("[ press ❎ to restart ]", 
 				  room_x*128+20,
 					 room_y*128+65, 7)
 	end
-debug()
+
+ if(game.debug) debug()
 end
 
 function _update()
-	--check temporary invincibility	
---	if(player.invincible.is) then
---		if(time() - player.invincible.since > 3) then
---			player.invincible.is = false
---			player.invincible.since = nil
---		end
---	end
 
-	if (not gamewon and not gamelost) then
-		level_elapsedtime = time()		- level_starttime
-		if (timeleft>0 and score==level.maxscore) then
-			gamewon = true
+	-- check player's temporary invulnerability	
+	if(player.invuln.is) then
+		if(time() - player.invuln.since > 3) then
+			player.invuln.is = false
+			player.invuln.since = nil
+			player.flash = false
+		end
+	end
+
+	if (not game.won and not game.lost) then
+		game.level.elapsedtime = time()		- game.level.starttime
+		if (game.level.timeleft>0 and score==game.level.maxscore) then
+			game.won = true
 		end
 	end	
 	
-	if (not gamewon and not gamelost) then
-		if (timeleft < 0) then
-		 gamelost = true
-			timeleft = 0
+	if (not game.won and not game.lost) then
+		if (game.level.timeleft < 0) then
+		 game.lost = true
+			game.level.timeleft = 0
 		else
-			timeleft = flr(level_maxtime - level_elapsedtime)
+			game.level.timeleft = flr(game.level.maxtime - game.level.elapsedtime)
 		end	
 	end
 	
  moveplayer()
 	
 	-- collect goal item
-	if (mget(player.pos.x,player.pos.y)==level.goalitem.s) then
+	if (mget(player.pos.x,player.pos.y)==game.level.goalitem.s) then
 		mset(player.pos.x,player.pos.y,14)
 		sfx(0)
 		score = score + 1
@@ -233,8 +210,8 @@ function _update()
 end
 
 function resetgamestate()
-		gamewon = false
-		gamelost = false
+		game.won = false
+		game.lost = false
 end
 -->8
 -- resets items in the game
@@ -334,7 +311,7 @@ end
 
 function movemadrabbits()
  for c in all(critters) do
-	 if (not gamewon and not gamelost)	then
+	 if (not game.won and not game.lost)	then
 	 	-- check where wabbit should turn
 			if (player.pos.x<c.pos.x and c.pos.x>=2) then
 				c.dx-= c.ac 
@@ -363,8 +340,8 @@ function movemadrabbits()
 				c.dy *=.2+rnd(4)/10	
 				
 			else 
-				c.dx*=-2 -- bounce!
-				c.dy*=-2 -- bounce!
+				c.dx*=-1 -- bounce!
+				c.dy*=-1 -- bounce!
 
 			end		
 		
@@ -376,7 +353,7 @@ function movemadrabbits()
 			-- (c.f+spd*2) 
 			if (spd < 0.05) c.f=0
 
-		end -- if (not gamewon and...
+		end -- if (not game.won and...
  end	--  for c in all(critters)...
 end -- function...
 -->8
@@ -385,7 +362,7 @@ function moveplayer()
 
 	player.ac=0.1 -- acceleration
 
- if (not gamewon and not gamelost)	then
+ if (not game.won and not game.lost)	then
 			if (btn(⬅️) and player.pos.x>=2) then
 				player.dx-= player.ac 
 				player.d=-1
@@ -401,20 +378,20 @@ function moveplayer()
 				player.dy+= player.ac
 			end
 	else
-			if (btn(❎)) _init(gamewon and not gamelost) 			
+			if (btn(❎)) _init(game.won and not game.lost) 			
  end
  
  -- detect collision
-		if not player:collideany() then
+		if player.invuln.is or not player:collideany() then
 		player.pos.x+=player.dx 		-- move (add velocity)
 		player.pos.y+=player.dy -- move (add velocity)
-	 player.dx *=.7 -- friction (lower for more)
-	 player.dy *=.7 -- friction (lower for more)
+		player.dx *=.7 -- friction (lower for more)
+		player.dy *=.7 -- friction (lower for more)
 
 		debugger.var.playerhit = false
 
 	else
-		--playerhit()
+		playerhit()
 		debugger.var.playerhit = true
 		player.dx *= -1		-- bounce!
 	end
@@ -428,30 +405,16 @@ function moveplayer()
 
 end
 
-function solidarea(x,y,w,h)	
-	return solid(x-w, y-h) or
-								solid(x+w, y-h) or
-								solid(x-w, y+h) or
-								solid(x+w, y+h)
-end
-
-function solid(x,y)
- -- grab the cell value
- val=mget(x, y)
- -- check if flag 0 is set
- debugger.var.solid=tostr(flr(x))..","..tostr(flr(y)).." "..tostr(fget(val, 0))
- return fget(val, 0)
-end
-
 function playerhit()
---	if(not player.invincible.is) then
+	if(not player.invuln.is) then
 		player.lives -= 1
---		player.invincible.is = true
---		player.invincible.since = time()
---	end
+		player.invuln.is = true
+		player.invuln.since = time()
+		player.flash = true
+	end
 	
 	if(	player.lives == 0) then
-	 gamelost = true
+	 game.lost = true
 	end	
 	
 end
@@ -460,12 +423,13 @@ function intersect(min1, max1, min2, max2)
   return max(min1,max1) > min(min2,max2) and
          min(min1,max1) < max(min2,max2)
 end
+
  
 function actorcollide(actor1,actor2)
- return intersect(actor1.pos.x, actor1.pos.x+8,
-      actor2.pos.x, actor2.pos.x+8) and
- intersect(actor1.pos.y, actor1.pos.y+8,
-      actor2.pos.y, actor2.pos.y+8)
+ return intersect(actor1.pos.x*8, actor1.pos.x*8+8,
+      actor2.pos.x*8, actor2.pos.x*8+8) and
+ intersect(actor1.pos.y*8, actor1.pos.y*8+8,
+      actor2.pos.y*8, actor2.pos.y*8+8)
 end
 
 function player:collideany()
@@ -479,14 +443,12 @@ end
 
 function player:collide(actor)
  if actorcollide(player,actor) then return true
- else return false
+ 	else return false
  end
 end
 -->8
 -- debugger logic
-debugger = { var = {	player_hits = 0,
-																					playerhit = false,
-																					solid = false
+debugger = { var = {	playerhit = false,
 																			}
 											}
 											
@@ -506,19 +468,36 @@ print(label..": "..tostr(obj),
 end
 
 function debug()
---	prt_debug("player.lives", player.lives, 10)
---	prt_debug("gamewon", gamewon, 20)
---	prt_debug("gamelost", gamelost, 30)	
---	prt_debug("gametime", gametime, 40)	\
---	prt_debug("timeleft", timeleft, 30)
-	prt_debug("#critters", #critters, 70)
---	prt_debug("level_time", level_time, 40)	
---	prt_debug("player_hits", debugger.var.player_hits, 40)
 	prt_debug("player hit", debugger.var.playerhit, 80)
-		prt_debug("solid", debugger.var.solid, 90)
---	prt_debug("critters.len", #critters, 50)
 end
 
+-->8
+-- draw the timer
+function drawtimer()
+
+	level_progress = game.level.timeleft/game.level.maxtime
+	
+	if (level_progress>=5/6)	then sandglass_s = 7 end
+	if (level_progress>=4/6 and
+					level_progress< 5/6) then sandglass_s = 23 end
+	if (level_progress>=6 and
+					level_progress< 4/6) then sandglass_s = 8 end
+	if (level_progress>=2/6 and
+					level_progress< 3/6) then sandglass_s = 24 end
+	if (level_progress>=1/6 and
+					level_progress< 2/6) then sandglass_s = 9 end
+	if (level_progress< 1/6) then sandglass_s = 25 end
+	if (game.level.timeleft==0) then sandglass_s = 22 end
+		 
+	spr(sandglass_s, -- sandglass 
+					 room_x*128+9,
+					 room_y*128+26)	
+	
+	print(game.level.timeleft, 
+				  room_x*128+20,
+				  room_y*128+27)
+
+end
 __gfx__
 0000000000000000000000000007000700070007000000000000000004444440044444400444444033333b333333333333333333339933333333333333333333
 000000000007000700070007000777770007777708200820007777700999997006666970066666703333b33333b3333333333333339a39933333333333b33333
