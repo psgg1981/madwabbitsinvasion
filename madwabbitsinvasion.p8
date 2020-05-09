@@ -36,7 +36,10 @@ game 				=	{	debug = false,
 																										starttime = time(),
 																										elapsedtime = 0,
 																										maxtime = 30,
-																										timeleft = maxtime	}
+																										timeleft = maxtime	},
+												 scene = "menu",
+												 room_x = flr(player.pos.x/16),
+													room_y = flr(player.pos.y/16)
 											}										
 
 
@@ -82,136 +85,167 @@ end
 function _draw()
 	cls(1)
 	
-	-- move camera to current room
-	room_x = flr(player.pos.x/16)
-	room_y = flr(player.pos.y/16)
-	camera(room_x*128,room_y*128)
-	
-	-- draw the whole map (128⁙32)
-	map()
-	
-	-- draw the player (if he's not flashing)
-	if not player.flash then
-		spr(1+player.f,      -- frame index
-		 player.pos.x*8-4,	-- x (pixels)
-		 player.pos.y*8-4, -- y (pixels)
-		 1,1,player.d==-1    -- w,h, flip
-		)
-	end
-	
-	-- only draw the player on a non-flash frame
-	if(player.invuln.is) then 
-		if(player.flash) then player.flash = false
-		else player.flash = true
-		end
-	end
-	
-	-- draw player's lives
-	for i=0, player.lives-1 do
-		spr(5, 
-						room_x*128+9+8*i,
-						room_y*128+8)	
-	end
-	if (player.lives==0) then
-		spr(6, 
-						room_x*128+9,
-						room_y*128+8)	
-	end
-	
-	-- draw the goal item and progress
-	spr(game.level.goalitem.s, 
-						room_x*128+9,
-						room_y*128+17)	
-					  
-	print(score.."/"..game.level.maxscore, 
-					  room_x*128+19,
-					  room_y*128+19, 7)
+	if(game.scene=="menu") then
+  printmenu()
 
-	-- draw the timer 'sandglass'
-	drawtimer()
+	else		
 
-	-- draw the mad rabbits
- drawmadrabbits()
+		-- move camera to current room
+		camera(game.room_x*128,
+									game.room_y*128)
 		
- -- draw game won
-	if (game.won) then
-		print("you won!", 
-				  room_x*128+50,
-					 room_y*128+55, 7)
-	end
-					  
- -- draw game over
-	if (game.lost) then
-		timesuplbl = ""
-		yourdeadlbl = ""
-	 if(game.level.timeleft==0) 				timesuplbl = " time's up!"
-	 if(player.lives==0) yourdeadlbl = " you're dead!"
-		print("game over!"..timesuplbl..yourdeadlbl, 
-				  room_x*128+27,
-					  room_y*128+55, 7)
-	end
+		-- draw the whole map (128⁙32)
+		map()
+		
+		-- draw the player (if he's not flashing)
+		if not player.flash then
+			spr(1+player.f,      -- frame index
+			 player.pos.x*8-4,	-- x (pixels)
+			 player.pos.y*8-4, -- y (pixels)
+			 1,1,player.d==-1    -- w,h, flip
+			)
+		end
+		
+		-- only draw the player on a non-flash frame
+		if(player.invuln.is) then 
+			if(player.flash) then player.flash = false
+			else player.flash = true
+			end
+		end
+		
+		-- draw player's lives
+		for i=0, player.lives-1 do
+			spr(5, 
+							game.room_x*128+9+8*i,
+							game.room_y*128+8)	
+		end
+		if (player.lives==0) then
+			spr(6, 
+							game.room_x*128+9,
+							game.room_y*128+8)	
+		end
+		
+		-- draw the goal item and progress
+		spr(game.level.goalitem.s, 
+						game.room_x*128+9,
+						game.room_y*128+17)	
+						  
+		print(score.."/"..game.level.maxscore, 
+						  game.room_x*128+19,
+						  game.room_y*128+19, 7)
+	
+		-- draw the timer 'sandglass'
+		drawtimer()
+	
+		-- draw the mad rabbits
+	 drawmadrabbits()
+			
+	 -- draw game won
+		if (game.won) then
+			print("you won!", 
+					  		game.room_x*128+50,
+						 		game.room_y*128+55, 7)
+		end
+						  
+	 -- draw game over
+		if (game.lost) then
+			timesuplbl = ""
+			yourdeadlbl = ""
+		 if(game.level.timeleft==0) 				timesuplbl = " time's up!"
+		 if(player.lives==0) yourdeadlbl = " you're dead!"
+			print("game over!"..timesuplbl..yourdeadlbl, 
+					  		game.room_x*128+27,
+						  	game.room_y*128+55, 7)
+		end
+	
+		if(game.won or game.lost) then
+		 presskeytostart(game.room_x*128+20, game.room_y*128+65)
+		end
+	
+	 if(game.debug) debug()
 
-	if(game.won or game.lost) then
-		print("[ press ❎ to restart ]", 
-				  room_x*128+20,
-					 room_y*128+65, 7)
-	end
+	end -- if(game.scene...
 
- if(game.debug) debug()
-end
+end -- _draw()	
 
 function _update()
 
-	-- check player's temporary invulnerability	
-	if(player.invuln.is) then
-		if(time() - player.invuln.since > 3) then
-			player.invuln.is = false
-			player.invuln.since = nil
-			player.flash = false
-		end
-	end
-
-	if (not game.won and not game.lost) then
-		game.level.elapsedtime = time()		- game.level.starttime
-		if (game.level.timeleft>0 and score==game.level.maxscore) then
-			game.won = true
-		end
-	end	
+	if(game.scene == "menu") then
 	
-	if (not game.won and not game.lost) then
-		if (game.level.timeleft < 0) then
-		 game.lost = true
-			game.level.timeleft = 0
-		else
-			game.level.timeleft = flr(game.level.maxtime - game.level.elapsedtime)
+	 -- get back to game upon ❎ pressing
+		if (btn(❎)) then
+			_init(false)
+			game.scene = "game"
+		end
+	
+	else -- already in game
+	
+		-- check player's temporary invulnerability	
+		if(player.invuln.is) then
+			if(time() - player.invuln.since > 3) then
+				player.invuln.is = false
+				player.invuln.since = nil
+				player.flash = false
+			end
+		end
+	
+	 -- reached max score? won!
+		if (not game.won and not game.lost) then
+			game.level.elapsedtime = time()		- game.level.starttime
+			if (game.level.timeleft>0 and score==game.level.maxscore) then
+				game.won = true
+			end
 		end	
-	end
-	
- moveplayer()
-	
-	-- collect goal item
-	if (mget(player.pos.x,player.pos.y)==game.level.goalitem.s) then
-		mset(player.pos.x,player.pos.y,14)
-		sfx(0)
-		score = score + 1
-	end
-
-	-- collect potion to increase lives
-	if (mget(player.pos.x,player.pos.y)==44) then
-		mset(player.pos.x,player.pos.y,14)
-		sfx(0)
-		if(player.lives<3) then
-			player.lives += 1
+		
+		-- time over? lost!
+		if (not game.won and not game.lost) then
+			if (game.level.timeleft < 0) then
+			 game.lost = true
+				game.level.timeleft = 0
+			else
+				game.level.timeleft = flr(game.level.maxtime - game.level.elapsedtime)
+			end	
 		end
-	end
+				
+	 moveplayer()
+		
+		-- collect goal item; increase score
+		if (mget(player.pos.x,player.pos.y)==game.level.goalitem.s) then
+			mset(player.pos.x,player.pos.y,14)
+			sfx(0)
+			score = score + 1
+		end
 	
-	movemadrabbits()
-	
-end
+		-- collect potion to increase lives
+		if (mget(player.pos.x,player.pos.y)==44) then
+			mset(player.pos.x,player.pos.y,14)
+			sfx(0)
+			if(player.lives<3) then
+				player.lives += 1
+			end
+		end
+		
+		movemadrabbits()
+
+ end
+end -- _update()
 
 function resetgamestate()
 		game.won = false
 		game.lost = false
+end
+
+function printmenu()
+ 
+ camera(game.room_x*128,
+  						game.room_y*128)
+  						
+	presskeytostart(game.room_x*128+20, 
+																	game.room_y*128+65)
+end
+
+function presskeytostart(x, y)
+		print("[ press ❎ to restart ]",x,y,7)
 end
 -->8
 -- resets items in the game
@@ -403,6 +437,10 @@ function moveplayer()
 	player.f= (player.f+spd*2) % 4 -- 4 frames
 	if (spd < 0.05) player.f=0
 
+ -- update game room, as per current player position
+ game.room_x = flr(player.pos.x/16)
+ game.room_y = flr(player.pos.y/16)
+
 end
 
 function playerhit()
@@ -490,12 +528,12 @@ function drawtimer()
 	if (game.level.timeleft==0) then sandglass_s = 22 end
 		 
 	spr(sandglass_s, -- sandglass 
-					 room_x*128+9,
-					 room_y*128+26)	
+					game.room_x*128+9,
+					game.room_y*128+26)	
 	
 	print(game.level.timeleft, 
-				  room_x*128+20,
-				  room_y*128+27)
+				  	game.room_x*128+20,
+				  	game.room_y*128+27)
 
 end
 __gfx__
